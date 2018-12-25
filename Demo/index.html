@@ -19,16 +19,17 @@
 <body>
 
     <script src="../build/three.js"></script>
-    /*相机控制*/
     <script src="lib/js/controls/OrbitControls.js"></script>
     <script src="lib/js/loaders/FBXLoader.js"></script>
     <script src="lib/js/WebGL.js"></script>
     <script src="lib/js/libs/stats.min.js"></script>
     <script src="lib/js/libs/inflate.min.js"></script>
 
-    <script src="lib/js/loaders/PLYLoader.js"></script>
+    <!-- <script src="lib/js/loaders/PLYLoader.js"></script> -->
 
     <script>
+
+
 
         if (WEBGL.isWebGLAvailable() === false) {
 
@@ -38,8 +39,15 @@
 
         var container, stats, controls;
         var camera, scene, renderer, light;
-
-        var fbxPath, texturePath, floorTexturePath;
+        var fbxPath = "resource/models/testFBX.FBX"
+        var texturePath = {
+            baseColor: 'resource/textures/6414/baseColor.png',
+            metallic: 'resource/textures/6414/baseColor.png',
+            normal: 'resource/textures/6414/normal.png',
+            roughness: 'resource/textures/6414/roughness.png',
+            ambientOcclusion: 'resource/textures/6414/ambientOcclusion.png',
+        };
+        var textureCube;
 
         init();
         animate();
@@ -47,7 +55,6 @@
         function init() {
             container = document.createElement('div');
             document.body.appendChild(container);
-            initData();
             LoadFbx();
             initFunctionAndController();
             initLight();
@@ -55,38 +62,34 @@
             Renderer();
         }
 
-        function initData() {
-            fbxPath = "resource/models/天一美家_法米_SB081休闲椅_cs.FBX"
-            texturePath = {
-                baseColor: { url: 'resource/textures/6414/baseColor.png' },
-                metallic: { url: 'resource/textures/6414/baseColor.png' },
-                normal: { url: 'resource/textures/6414/normal.png' },
-                roughness: { url: 'resource/textures/6414/roughness.png' },
-                ambientOcclusion: { url: 'resource/textures/6414/ambientOcclusion.png' },
-            };
-            floorTexturePath = {
-                baseColor: { url: 'resource/textures/floors/FloorsCheckerboard_S_Diffuse.jpg' },
-                normal: { url: 'resource/textures/floors/FloorsCheckerboard_S_Normal.jpg' },
-            }
-        }
-
         function initFunctionAndController() {
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 5, 5000);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 5, 10000);
             camera.position.set(500, 1000, 1500);
 
             controls = new THREE.OrbitControls(camera);
             controls.target.set(0, 200, 0);
+            //scale limits.
+            controls.maxDistance = 2000;
+            //orbit vertically, upper and lower limits.Range is 0 to Math.PI radians.
+            controls.maxPolarAngle = Math.PI / 2;
             controls.update();
 
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xa0a0a0);
-            // scene.fog = new THREE.Fog(0xa0a0a0, 1000, 1000);
-            scene.background = new THREE.CubeTextureLoader()
+            scene.background = CubMapLoad();
+            // stats
+            // stats = new Stats();
+            // container.appendChild(stats.dom);
+        }
+
+        function CubMapLoad() {
+            textureCube = new THREE.CubeTextureLoader()
                 .setPath('resource/textures/skybox/')
                 .load(['px.jpg', 'nx.jpg', 'py.jpg', 'ny.jpg', 'pz.jpg', 'nz.jpg']);
-            // stats
-            stats = new Stats();
-            container.appendChild(stats.dom);
+            textureCube.format = THREE.RGBFormat;
+            textureCube.mapping = THREE.CubeReflectionMapping;
+            textureCube.encoding = THREE.sRGBEncoding;
+            return textureCube;
         }
 
         function initLight() {
@@ -95,69 +98,45 @@
             scene.add(light);
 
             light = new THREE.DirectionalLight(0xffffff);
-            light.position.set(0, 200, 100);
+            light.position.set(30, 200, 100);
             light.castShadow = true;
-            light.shadow.camera.top = 180;
-            light.shadow.camera.bottom = -100;
-            light.shadow.camera.left = -120;
-            light.shadow.camera.right = 120;
+            light.shadow.camera.top = 2000;
+            light.shadow.camera.bottom = -2000;
+            light.shadow.camera.left = -2000;
+            light.shadow.camera.right = 2000;
             scene.add(light);
         }
 
         function initMesh() {
-            var baseColor = getTexture(floorTexturePath, "baseColor");
-            var normal = getTexture(floorTexturePath, "normal");
-            var mat = new THREE.MeshStandardMaterial();
-            mat.map = baseColor;
-            mat.normalMap = normal;
-            console.log(baseColor);
-            // mat.color = getTexture(floorTexturePath, "baseColor");
-            var mesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(1000, 1000), mat);
+            var material = new THREE.MeshStandardMaterial({
+                roughness: 0.7,
+                color: 0x2f3e5c,
+                bumpScale: 0.002,
+                metalness: 0.2
+            });
+            var loader = new THREE.FBXLoader();
+            loader.load("resource/models/background.fbx", function (object) {
+                object.traverse(function (child) {
+                    if (child.isMesh) {
+                        const oldMat = child.material;
+                        child.material = material;
+                        child.scale.set(3000, 3000, 3000);
+                        child.position.y -= 5;
+                    }
+                });
+                scene.add(object);
+            });
+            var mesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(1200, 1200), material);
             mesh.rotation.x = - Math.PI / 2;
             mesh.receiveShadow = true;
             scene.add(mesh);
-
-            //box
-            // var textureLoader = new THREE.TextureLoader();
-            // var cubeMat = new THREE.MeshStandardMaterial({
-            //     roughness: 0.7,
-            //     color: 0xffffff,
-            //     bumpScale: 0.002,
-            //     metalness: 0.2
-            // });
-            // textureLoader.load("resource/textures/decal/decal-diffuse.png", function (map) {
-            //     map.wrapS = THREE.RepeatWrapping;
-            //     map.wrapT = THREE.RepeatWrapping;
-            //     map.anisotropy = 4;
-            //     map.repeat.set(1, 1);
-            //     cubeMat.map = map;
-            //     cubeMat.needsUpdate = true;
-            // });
-            // textureLoader.load("resource/textures/decal/decal-normal.jpg", function (map) {
-            //     map.wrapS = THREE.RepeatWrapping;
-            //     map.wrapT = THREE.RepeatWrapping;
-            //     map.anisotropy = 4;
-            //     map.repeat.set(1, 1);
-            //     cubeMat.normalMap = map;
-            //     cubeMat.needsUpdate = true;
-            // });
-            // var boxGeometry = new THREE.BoxBufferGeometry(100, 100, 100);
-            // var boxMesh = new THREE.Mesh(boxGeometry, cubeMat);
-            // boxMesh.position.set(100, 50, 0);
-            // boxMesh.castShadow = true;
-            // scene.add(boxMesh);
         }
 
         function LoadFbx() {
 
             var textureLoader = new THREE.TextureLoader();
-            var mat = new THREE.MeshStandardMaterial({
-                roughness: 0.7,
-                color: 0xffffff,
-                bumpScale: 0.002,
-                metalness: 0.2
-            });
-            textureLoader.load("resource/textures/6414/baseColor.png", function (map) {
+            var mat = new THREE.MeshPhongMaterial();
+            textureLoader.load(texturePath['baseColor'], function (map) {
                 map.wrapS = THREE.RepeatWrapping;
                 map.wrapT = THREE.RepeatWrapping;
                 map.anisotropy = 4;
@@ -165,7 +144,7 @@
                 mat.map = map;
                 mat.needsUpdate = true;
             });
-            textureLoader.load("resource/textures/6414/normal.png", function (map) {
+            textureLoader.load(texturePath['normal'], function (map) {
                 map.wrapS = THREE.RepeatWrapping;
                 map.wrapT = THREE.RepeatWrapping;
                 map.anisotropy = 4;
@@ -173,81 +152,48 @@
                 mat.normalMap = map;
                 mat.needsUpdate = true;
             });
-            // textureLoader.load("resource/textures/6414/metallic.png", function (map) {
-            //     map.wrapS = THREE.RepeatWrapping;
-            //     map.wrapT = THREE.RepeatWrapping;
-            //     map.anisotropy = 4;
-            //     map.repeat.set(1, 1);
-            //     mat.metalnessMap = map;
-            //     mat.needsUpdate = true;
-            // });
-            // textureLoader.load("resource/textures/6414/roughness.png", function (map) {
-            //     map.wrapS = THREE.RepeatWrapping;
-            //     map.wrapT = THREE.RepeatWrapping;
-            //     map.anisotropy = 4;
-            //     map.repeat.set(1, 1);
-            //     mat.roughnessMap = map;
-            //     mat.needsUpdate = true;
-            // });
-            // textureLoader.load("resource/textures/6414/", function (map) {
-            //     map.wrapS = THREE.RepeatWrapping;
-            //     map.wrapT = THREE.RepeatWrapping;
-            //     map.anisotropy = 4;
-            //     map.repeat.set(1, 1);
-            //     mat.AmbientColor = map;
-            //     mat.needsUpdate = true;
-            // });
-
-            // model
-            // var loader = new THREE.FBXLoader();
-
-            // var loader = new THREE.PLYLoader();
-            // loader.load('resource/models/Lucy100k.ply', function (geometry) {
-            //     geometry.computeVertexNormals();
-            //     // var material = new THREE.MeshStandardMaterial( { color: 0x0055ff, flatShading: true } );
-
-            //     var mesh = new THREE.Mesh(geometry, mat);
-            //     mesh.castShadow = true;
-            //     mesh.receiveShadow = true;
-            //     mesh.scale.multiplyScalar( 0.3 );
-            //     mesh.position.y += 240;
-            //     scene.add(mesh);
-            // });
-
-            var loader = new THREE.FBXLoader();
-            loader.load('resource/models/testFBX.FBX', function (object) {
-
-                scene.add(object);
-
+            textureLoader.load(texturePath['metallic'], function (map) {
+                map.wrapS = THREE.RepeatWrapping;
+                map.wrapT = THREE.RepeatWrapping;
+                map.anisotropy = 4;
+                map.repeat.set(1, 1);
+                mat.metalnessMap = map;
+                mat.needsUpdate = true;
             });
-
-            var tmp;
-
-            var loader = new THREE.FBXLoader();
-            loader.load('resource/models/Samba Dancing.fbx', function (object) {
-
-                tmp = object;
-                scene.add(object);
-
+            textureLoader.load(texturePath['roughness'], function (map) {
+                map.wrapS = THREE.RepeatWrapping;
+                map.wrapT = THREE.RepeatWrapping;
+                map.anisotropy = 4;
+                map.repeat.set(1, 1);
+                mat.roughnessMap = map;
+                mat.needsUpdate = true;
             });
-
-            // var tmpMesh = new THREE.Mesh(tmp, new THREE.MeshStandardMaterial({ color: 0x0055ff, flatShading: true }));
-            // tmpMesh.position.x -= 20;
-            // scene.add(tmpMesh);
-        }
-
-        //贴图加载（卸载？）
-        function getTexture(content, name) {
-            var texture = content[name].texture;
-
-            if (!texture) {
-                texture = content[name].texture = new THREE.TextureLoader().load(content[name].url);
-                texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            mat.envMap = textureCube;
+            if (!texturePath['ambientOcclusion'] === null) {
+                textureLoader.load(texturePath['ambientOcclusion'], function (map) {
+                    map.wrapS = THREE.RepeatWrapping;
+                    map.wrapT = THREE.RepeatWrapping;
+                    map.anisotropy = 4;
+                    map.repeat.set(1, 1);
+                    mat.aoMap = map;
+                    mat.needsUpdate = true;
+                });
             }
-            return texture;
+
+            var loader = new THREE.FBXLoader();
+            loader.load(fbxPath, function (object) {
+                object.traverse(function (child) {
+                    if (child.isMesh) {
+                        const oldMat = child.material;
+                        child.material = mat;
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        child.scale.set(0.5, 0.5, 0.5);
+                    }
+                });
+                scene.add(object);
+            });
         }
-
-
 
         function Renderer() {
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -275,7 +221,7 @@
             requestAnimationFrame(animate);
 
             renderer.render(scene, camera);
-            stats.update();
+            // stats.update();
         }
 
     </script>
